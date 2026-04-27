@@ -144,20 +144,36 @@ ${JSON.stringify(matchesWithFairProb, null, 2)}
     let text = '';
 
     if (modelProvider === 'deepseek') {
-      const apiKey = process.env.DEEPSEEK_API_KEY;
-      if (!apiKey) throw new Error('DeepSeek API Key is missing. Please add it to your secrets.');
-      const dsRes = await fetch('https://api.deepseek.com/v1/chat/completions', {
+      const explicitSchemaStr = `
+You MUST return ONLY valid JSON matching this exact structure:
+{
+  "articleIntro": "string (Overall analysis)",
+  "matchAnalyses": [
+    {
+      "matchId": "string (The match ID)",
+      "recommendation": "string (Best bet recommendation)",
+      "adjustedProbabilities": { "home": number, "draw": number, "away": number },
+      "confidence": number,
+      "reasoning": "string",
+      "expectedValue": number,
+      "goalsData": "string",
+      "h2hData": "string",
+      "scheduleData": "string",
+      "clvPotential": "string"
+    }
+  ]
+}`;
+      const dsRes = await fetch('/api/deepseek', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           model: 'deepseek-chat',
           messages: [
             {
               role: 'system',
-              content: 'You are a professional football data analyst. Please output your analysis ONLY in valid JSON format. Make sure to follow the JSON schema implied by the prompt strictly.'
+              content: 'You are a professional football data analyst. ' + explicitSchemaStr
             },
             {
               role: 'user',
@@ -170,7 +186,8 @@ ${JSON.stringify(matchesWithFairProb, null, 2)}
       });
 
       if (!dsRes.ok) {
-        throw new Error(`DeepSeek API failed: ${dsRes.status}`);
+        const errJson = await dsRes.json().catch(() => ({}));
+        throw new Error(`DeepSeek API failed: ${dsRes.status} ${errJson.error || ''}`);
       }
 
       const dsData = await dsRes.json();

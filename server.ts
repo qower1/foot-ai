@@ -17,6 +17,37 @@ async function startServer() {
     res.json({ status: 'ok' });
   });
 
+  app.post('/api/deepseek', async (req, res) => {
+    try {
+      const apiKey = process.env.DEEPSEEK_API_KEY;
+      if (!apiKey) {
+        return res.status(400).json({ error: 'DeepSeek API Key is missing. Please add it to your environment variables.' });
+      }
+
+      console.log('Forwarding request to DeepSeek API...');
+      const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify(req.body)
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('DeepSeek API error:', response.status, errorText);
+        return res.status(response.status).json({ error: `DeepSeek API failed: ${response.status}`, details: errorText });
+      }
+
+      const data = await response.json();
+      res.json(data);
+    } catch (error: any) {
+      console.error('Error in /api/deepseek:', error);
+      res.status(500).json({ error: 'Failed to connect to DeepSeek API', details: error.message });
+    }
+  });
+
   app.get('/api/matches/html', async (req, res) => {
     try {
       console.log('Fetching matches from zgzcw...');
