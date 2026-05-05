@@ -151,7 +151,7 @@ You MUST return ONLY valid JSON matching this exact structure:
   "matchAnalyses": [
     {
       "matchId": "string (The match ID)",
-      "recommendation": "string (Best bet recommendation)",
+      "recommendation": "string (must be one of: 'home', 'draw', 'away', 'letHome', 'letDraw', 'letAway', 'pass')",
       "adjustedProbabilities": { "home": number, "draw": number, "away": number },
       "confidence": number,
       "reasoning": "string",
@@ -169,7 +169,7 @@ You MUST return ONLY valid JSON matching this exact structure:
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          model: 'deepseek-chat',
+          model: 'deepseek-v4-pro',
           messages: [
             {
               role: 'system',
@@ -302,15 +302,15 @@ You MUST return ONLY valid JSON matching this exact structure:
       return 1.85; // fallback average odds
     };
 
-    const getProb = (ev: number, odds: number) => {
-      const prob = (ev + 1) / odds;
-      return Math.min(Math.max(prob, 0.01), 0.99); // Clamp to 1% - 99%
+    const getProb = (p: Prediction) => {
+      // 按照用户需求：“最稳的2场”，直接利用AI的 confidence 作为胜率
+      return Math.min(Math.max((p.confidence || 50) / 100, 0.01), 0.99);
     };
 
     const enrichedPredictions = predictions.map(p => {
       const m = matches.find(m => m.id === p.matchId)!;
       const odds = getOdds(p, m);
-      const prob = getProb(p.expectedValue, odds);
+      const prob = getProb(p);
       return { p, m, odds, prob };
     });
 

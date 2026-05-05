@@ -177,7 +177,7 @@ export default function App() {
                   onChange={(e) => setModelProvider(e.target.value as 'gemini' | 'deepseek')}
                 >
                   <option value="gemini">Gemini 3.1 Pro</option>
-                  <option value="deepseek">DeepSeek Chat</option>
+                  <option value="deepseek">DeepSeek V4 Pro</option>
                 </select>
                 <div className="w-px h-8 bg-zinc-800 mx-1"></div>
                 <button

@@ -19,7 +19,8 @@ async function startServer() {
 
   app.post('/api/deepseek', async (req, res) => {
     try {
-      const apiKey = process.env.DEEPSEEK_API_KEY;
+      // 优先从环境变量获取，如果没有则使用用户提供的固定 Key
+      const apiKey = process.env.DEEPSEEK_API_KEY || 'sk-7ebd4fa7837f449eae338812a01f1c5e';
       if (!apiKey) {
         return res.status(400).json({ error: 'DeepSeek API Key is missing. Please add it to your environment variables.' });
       }
