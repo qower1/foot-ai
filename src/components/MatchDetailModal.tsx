@@ -53,11 +53,11 @@ export function MatchDetailModal({ match, prediction, onClose }: MatchDetailModa
             </button>
           </div>
 
-          <div className="p-8">
-            <div className="flex items-center justify-between mb-10">
+          <div className="p-4 sm:p-8 overflow-y-auto max-h-[calc(100dvh-5rem)]">
+              <div className="flex flex-col sm:flex-row items-center justify-between mb-8 sm:mb-10 gap-6 sm:gap-0">
               <div className="text-center flex-1">
-                <div className="text-3xl font-bold text-white mb-2">{match.homeTeam}</div>
-                <div className="text-sm text-zinc-500">主队 · 排名 {match.homeRank}</div>
+                <div className="text-2xl sm:text-3xl font-bold text-white mb-1 sm:mb-2">{match.homeTeam}</div>
+                <div className="text-xs sm:text-sm text-zinc-500">主队 · 排名 {match.homeRank}</div>
                 <div className="flex justify-center gap-1 mt-3">
                   {match.homeForm.map((f, i) => (
                     <span key={i} className={`w-5 h-5 flex items-center justify-center rounded text-[10px] font-bold ${f === 'W' ? 'bg-emerald-500/20 text-emerald-400' : f === 'D' ? 'bg-zinc-700 text-zinc-300' : 'bg-rose-500/20 text-rose-400'}`}>
@@ -70,8 +70,8 @@ export function MatchDetailModal({ match, prediction, onClose }: MatchDetailModa
               <div className="px-6 text-zinc-600 font-bold text-xl">VS</div>
               
               <div className="text-center flex-1">
-                <div className="text-3xl font-bold text-white mb-2">{match.awayTeam}</div>
-                <div className="text-sm text-zinc-500">客队 · 排名 {match.awayRank}</div>
+                <div className="text-2xl sm:text-3xl font-bold text-white mb-1 sm:mb-2">{match.awayTeam}</div>
+                <div className="text-xs sm:text-sm text-zinc-500">客队 · 排名 {match.awayRank}</div>
                 <div className="flex justify-center gap-1 mt-3">
                   {match.awayForm.map((f, i) => (
                     <span key={i} className={`w-5 h-5 flex items-center justify-center rounded text-[10px] font-bold ${f === 'W' ? 'bg-emerald-500/20 text-emerald-400' : f === 'D' ? 'bg-zinc-700 text-zinc-300' : 'bg-rose-500/20 text-rose-400'}`}>
@@ -82,7 +82,7 @@ export function MatchDetailModal({ match, prediction, onClose }: MatchDetailModa
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-8">
               <div className="bg-zinc-800/30 rounded-xl p-5 border border-zinc-800">
                 <div className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3">标准盘 (胜平负)</div>
                 <div className="flex justify-between font-mono text-lg">

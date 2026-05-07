@@ -117,18 +117,18 @@ export function HistoryView({ records, initialBankroll, onDeleteRecord, onUpdate
   return (
     <div className="flex-1 overflow-y-auto p-8">
       <div className="max-w-5xl mx-auto space-y-8">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h2 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
-              <Trophy className="w-6 h-6 text-amber-500" />
+            <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2">
+              <Trophy className="w-5 h-5 sm:w-6 sm:h-6 text-amber-500" />
               实战记录账本
             </h2>
-            <p className="text-zinc-400 mt-1">追踪您的AI推荐历史与盈亏表现</p>
+            <p className="text-xs sm:text-sm text-zinc-400 mt-1">追踪您的AI推荐历史与盈亏表现</p>
           </div>
           {onClearAllRecords && (
             <button
               onClick={onClearAllRecords}
-              className="flex items-center gap-2 px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-medium rounded-lg transition-colors border border-rose-500/20"
+              className="w-full sm:w-auto flex justify-center items-center gap-2 px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-medium rounded-lg transition-colors border border-rose-500/20"
             >
               <Trash2 className="w-4 h-4" />
               清空记录
@@ -137,51 +137,51 @@ export function HistoryView({ records, initialBankroll, onDeleteRecord, onUpdate
         </div>
 
         {/* 详细实战数据分析 */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-          <div className="bg-zinc-900/60 backdrop-blur-md border border-zinc-800/50 rounded-xl p-5">
-            <div className="flex items-center gap-2 text-zinc-400 mb-2">
-              <BarChart3 className="w-4 h-4" />
-              <span className="text-sm">总盈亏</span>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+          <div className="bg-zinc-900/60 backdrop-blur-md border border-zinc-800/50 rounded-xl p-3 sm:p-5">
+            <div className="flex items-center gap-1.5 text-zinc-400 mb-1 sm:mb-2">
+              <BarChart3 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span className="text-xs sm:text-sm">总盈亏</span>
             </div>
-            <span className={`text-2xl font-bold ${stats.totalProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+            <span className={`text-lg sm:text-2xl font-bold ${stats.totalProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
               {stats.totalProfit > 0 ? '+' : ''}¥{stats.totalProfit.toFixed(2)}
             </span>
           </div>
-          <div className="bg-zinc-900/60 backdrop-blur-md border border-zinc-800/50 rounded-xl p-5">
-            <div className="flex items-center gap-2 text-zinc-400 mb-2">
-              <TrendingUp className="w-4 h-4" />
-              <span className="text-sm">投资回报率 (ROI)</span>
+          <div className="bg-zinc-900/60 backdrop-blur-md border border-zinc-800/50 rounded-xl p-3 sm:p-5">
+            <div className="flex items-center gap-1.5 text-zinc-400 mb-1 sm:mb-2">
+              <TrendingUp className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span className="text-xs sm:text-sm">投资回报率</span>
             </div>
-            <span className={`text-2xl font-bold ${stats.roi >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+            <span className={`text-lg sm:text-2xl font-bold ${stats.roi >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
               {stats.roi > 0 ? '+' : ''}{stats.roi.toFixed(1)}%
             </span>
           </div>
-          <div className="bg-zinc-900/60 backdrop-blur-md border border-zinc-800/50 rounded-xl p-5">
-            <div className="flex items-center gap-2 text-zinc-400 mb-2">
-              <Target className="w-4 h-4" />
-              <span className="text-sm">胜率 ({stats.completedMatches}场已结)</span>
+          <div className="bg-zinc-900/60 backdrop-blur-md border border-zinc-800/50 rounded-xl p-3 sm:p-5">
+            <div className="flex items-center gap-1.5 text-zinc-400 mb-1 sm:mb-2">
+              <Target className="w-3.5 h-3.5 sm:w-4 sm:h-4 hover:group text-nowrap whitespace-nowrap" />
+              <span className="text-xs sm:text-sm whitespace-nowrap overflow-hidden text-ellipsis">胜率 ({stats.completedMatches}场)</span>
             </div>
-            <span className="text-2xl font-bold text-white">
+            <span className="text-lg sm:text-2xl font-bold text-white">
               {stats.winRate.toFixed(1)}%
             </span>
           </div>
-          <div className="bg-zinc-900/60 backdrop-blur-md border border-zinc-800/50 rounded-xl p-5">
-            <div className="flex items-center gap-2 text-zinc-400 mb-2">
-              <Trophy className="w-4 h-4" />
-              <span className="text-sm">红黑统计</span>
+          <div className="bg-zinc-900/60 backdrop-blur-md border border-zinc-800/50 rounded-xl p-3 sm:p-5">
+            <div className="flex items-center gap-1.5 text-zinc-400 mb-1 sm:mb-2">
+              <Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span className="text-xs sm:text-sm">红黑</span>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-2xl font-bold text-emerald-400">{stats.wonCount}红</span>
+            <div className="flex items-center gap-1 sm:gap-2">
+              <span className="text-lg sm:text-2xl font-bold text-emerald-400">{stats.wonCount}</span>
               <span className="text-zinc-600">/</span>
-              <span className="text-2xl font-bold text-rose-400">{stats.lostCount}黑</span>
+              <span className="text-lg sm:text-2xl font-bold text-rose-400">{stats.lostCount}</span>
             </div>
           </div>
-          <div className="bg-zinc-900/60 backdrop-blur-md border border-zinc-800/50 rounded-xl p-5">
-            <div className="flex items-center gap-2 text-zinc-400 mb-2">
-              <CheckCircle2 className="w-4 h-4" />
-              <span className="text-sm">平均命中赔率</span>
+          <div className="bg-zinc-900/60 backdrop-blur-md border border-zinc-800/50 rounded-xl p-3 sm:p-5">
+            <div className="flex items-center gap-1.5 text-zinc-400 mb-1 sm:mb-2">
+              <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span className="text-xs sm:text-sm whitespace-nowrap">平均赔率</span>
             </div>
-            <span className="text-2xl font-bold text-amber-400">
+            <span className="text-lg sm:text-2xl font-bold text-amber-400">
               {stats.avgOdds.toFixed(2)}
             </span>
           </div>
@@ -246,16 +246,16 @@ export function HistoryView({ records, initialBankroll, onDeleteRecord, onUpdate
         <div className="space-y-4">
           {records.map((record) => (
             <div key={record.id} className="bg-zinc-900/60 backdrop-blur-md border border-zinc-800/50 rounded-xl p-6 transition-all hover:border-zinc-700/50">
-              <div className="flex items-start justify-between mb-4">
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-4">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-zinc-800 rounded-lg">
+                  <div className="p-2 bg-zinc-800 rounded-lg shrink-0">
                     <Calendar className="w-5 h-5 text-zinc-400" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-bold text-white">
+                    <h3 className="text-base sm:text-lg font-bold text-white">
                       {new Date(record.date).toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                     </h3>
-                    <div className="flex items-center gap-2 text-sm mt-1">
+                    <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm mt-1">
                       <span className="text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded font-medium">
                         {record.strategy.type === 'single' ? '单关价值投' : '高赔率串关'}
                       </span>
@@ -264,7 +264,7 @@ export function HistoryView({ records, initialBankroll, onDeleteRecord, onUpdate
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto mt-2 sm:mt-0">
                   <select
                     value={record.status}
                     onChange={(e) => onUpdateStatus(record.id, e.target.value as any)}
@@ -281,15 +281,15 @@ export function HistoryView({ records, initialBankroll, onDeleteRecord, onUpdate
                   
                   <button 
                     onClick={() => onDeleteRecord(record.id)}
-                    className="p-2 text-zinc-500 hover:text-rose-400 hover:bg-rose-400/10 rounded-lg transition-colors"
+                    className="p-2.5 sm:p-2 text-zinc-500 hover:text-rose-400 hover:bg-rose-400/10 rounded-lg transition-colors border border-transparent hover:border-rose-500/20"
                     title="删除记录"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-5 h-5 sm:w-4 sm:h-4" />
                   </button>
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-4 mb-4 p-4 bg-zinc-800/30 rounded-lg border border-zinc-800">
+              <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-4 p-3 sm:p-4 bg-zinc-800/30 rounded-lg border border-zinc-800">
                 <div>
                   <span className="block text-xs text-zinc-500 mb-1">组合赔率</span>
                   <span className="font-mono font-bold text-white">{record.strategy.totalOdds.toFixed(2)}</span>

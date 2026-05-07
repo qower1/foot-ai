@@ -3,6 +3,63 @@ import { Match, Prediction, BettingStrategy } from '../types';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
+async function matchFixturesWithLLM(matches: Match[], footballFixtures: any[], aiModel: GoogleGenAI): Promise<Record<string, number>> {
+  if (!footballFixtures || footballFixtures.length === 0) return {};
+  
+  const prompt = `
+  You are an expert sports data matcher. Your job is to link Chinese football matches with English API-Football fixtures.
+  
+  Chinese Matches:
+  ${JSON.stringify(matches.map(m => ({ id: m.id, home: m.homeTeam, away: m.awayTeam, time: m.time, league: m.league })))}
+  
+  English Fixtures for Today (from API-Football):
+  ${JSON.stringify(footballFixtures.map(f => ({ id: f.id, home: f.home, away: f.away, league: f.league, time: f.time })))}
+  
+  Identify corresponding matches. Match as many as you confidently can based on team names, leagues, and kickoff times. 
+  Return a strict JSON array of matched pairs.
+  {"mappings": [ {"matchId": "string id from Chinese match", "fixtureId": 1234} ]}
+  `;
+  
+  try {
+    const response = await aiModel.models.generateContent({
+      model: 'gemini-3.1-pro-preview',
+      contents: prompt,
+      config: {
+        temperature: 0.1,
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            mappings: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  matchId: { type: Type.STRING },
+                  fixtureId: { type: Type.INTEGER }
+                },
+                required: ['matchId', 'fixtureId']
+              }
+            }
+          },
+          required: ['mappings']
+        }
+      }
+    });
+    
+    if (!response.text) return {};
+    const parsed = JSON.parse(response.text);
+    const mapping: Record<string, number> = {};
+    for (const item of parsed.mappings || []) {
+      mapping[item.matchId] = item.fixtureId;
+    }
+    return mapping;
+  } catch (error) {
+    console.error('Error matching fixtures with LLM:', error);
+    return {};
+  }
+}
+
 export async function fetchLiveMatches(): Promise<Match[]> {
   try {
     // Fetch the parsed JSON from our backend
@@ -86,6 +143,53 @@ export async function analyzeMatches(
   modelProvider: 'gemini' | 'deepseek' = 'gemini'
 ): Promise<{ predictions: Prediction[], strategy: BettingStrategy, articleIntro: string }> {
   
+  // 0. Enhance with API Football data
+  let apiFootballPredictionsContext = '';
+  try {
+    if (matches.length > 0) {
+      const d = new Date();
+      // Adjust to UTC since API-Football uses UTC dates
+      const dateStr = [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('-');
+      
+      const fixRes = await fetch(`/api/football/fixtures?date=${dateStr}`);
+      if (fixRes.ok) {
+        const fixtures = await fixRes.json();
+        
+        // Match them
+        const mappings = await matchFixturesWithLLM(matches, fixtures, ai);
+        
+        // Fetch predictions
+        const predictionPromises = Object.entries(mappings).map(async ([matchId, fixtureId]) => {
+          const predRes = await fetch(`/api/football/predictions?fixture=${fixtureId}`);
+          if (predRes.ok) {
+            const predData = await predRes.json();
+            return { matchId, predData };
+          }
+          return null;
+        });
+        
+        const results = (await Promise.all(predictionPromises)).filter(Boolean);
+        
+        if (results.length > 0) {
+          apiFootballPredictionsContext = '\n【API-Football 海外深度预测数据】\n' + JSON.stringify(results.map(r => {
+            const match = matches.find(m => m.id === r!.matchId);
+            return {
+              队伍: `${match?.homeTeam} vs ${match?.awayTeam}`,
+              API预测胜率: r!.predData?.predictions?.percent,
+              API建议推荐: r!.predData?.predictions?.advice,
+              主队近期战绩形态: r!.predData?.teams?.home?.league?.form,
+              客队近期战绩形态: r!.predData?.teams?.away?.league?.form,
+              进球数预测: r!.predData?.predictions?.goals,
+              交锋历史表现: r!.predData?.h2h?.length + '场最近交锋记录'
+            };
+          }), null, 2) + '\n(请在分析时重点结合上述海外专家系统给出的精准数据，例如胜率、预期进球等进行多维度推演)';
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Failed to enrich matches with api-football:', error);
+  }
+
   // 1. TypeScript 算数学：计算市场公平概率 (Vig Removal)
   const matchesWithFairProb = matches.map(match => {
     if (!match.odds || !match.odds.home || !match.odds.draw || !match.odds.away) {
@@ -113,31 +217,29 @@ export async function analyzeMatches(
 
 【核心任务：补充多维度基本面数据】
 请分析以下每场比赛的最新深度数据：
-1. 双方本赛季的 xG (期望进球) 和 xGA (期望失球) 数据。如果找不到准确的 xG，请根据两队的进攻和防守风格进行合理推演。
+1. 双方本赛季的 xG (期望进球) 和 xGA (期望失球) 数据。
 2. 双方历史交锋记录（H2H）
-3. 双方核心球员伤停情况（Injuries & Suspensions）- 极度重要！
+3. 双方核心球员伤停情况（Injuries & Suspensions）
 4. 双方近期赛程密集度与体能状况（Schedule & Fatigue）
-5. 双方战意与积分榜形势（Motivation & Table Position）
+5. 双方战意与积分榜形势
+
+${apiFootballPredictionsContext}
 
 【逻辑推理与概率微调】
-1. 比较基本面与市场预期：如果你发现主队有核心前锋伤停，或者刚踢完欧冠体能极差，你应该将主队的“真实概率”调低（低于市场公平概率）。
-2. xG 修正：使用搜索到的 xG/xGA 数据替代实际进球数，作为评估球队真实创造机会和防守能力的核心依据。如果某队实际进球远高于 xG，说明存在运气成分，应适当回调其真实概率。
-3. Dixon-Coles 修正（低比分平局修正）：基础泊松分布通常会低估 0-0 和 1-1 的发生概率。在评估两支防守稳健或进攻乏力的球队时，必须手动上调平局（Draw）的真实概率，并相应下调胜负概率。
-4. 亚盘优先原则 (Asian Handicap Focus)：标准盘(1X2)抽水通常在5%-8%，而亚盘抽水仅2%-3%。在计算出真实概率后，请务必评估亚盘(letOdds)的价值。如果亚盘存在价值，必须优先推荐亚盘 (letHome/letAway)，以大幅减少长期摩擦成本。
-5. CLV (Closing Line Value) 预判：分析当前赔率是否具有跑赢临场关盘的潜力。结合基本面（如某队主力即将宣布伤停，或公众资金倾向），预判赔率走势。
+1. 比较基本面与市场预期：如果你发现某队有伤停，或刚踢完欧冠体能极差，应调低其真实概率。
+2. xG 修正与泊松模型调整。
+3. Dixon-Coles 修正（低比分平局修正）：关注0-0和1-1可能。
+4. 亚盘优先原则 (Asian Handicap Focus)：如果亚盘(letOdds)有价值优先推荐亚盘。
+5. CLV (Closing Line Value) 预判。
 6. 调整后的概率必须满足：home + draw + away = 1.0。
-7. 给出你的信心指数（0-100）。如果基本面信息极度混乱或缺乏数据，请降低信心指数。
-8. 撰写深度推理逻辑（reasoning），解释你为什么这样调整概率，必须提及 xG 数据、Dixon-Coles 修正、亚盘价值以及 CLV 预判的具体应用。
-9. 无论 EV 是否达到阈值，请务必为每场比赛选出**最有可能打出且最具价值**的选项（recommendation），不要使用 'pass'。我们将由底层的 TypeScript 引擎来决定最终的精选组合。
+7. 给出你的信心指数（0-100）。
+8. 无论 EV 是否达到阈值，请务必为每场比赛选出**最有可能打出且最具价值**的选项（recommendation）。
 
 赛事数据与市场公平概率：
 ${JSON.stringify(matchesWithFairProb, null, 2)}
 
 请返回一个严格的JSON格式，包含每场比赛的分析（matchAnalyses）和今日的整体分析描述（articleIntro）。
-要求：
-- articleIntro 必须包含具体的赛程与体能分析。
-- 语气专业、客观、充满科技感。
-- 绝对不能包含“赌博”、“包赢”、“下注”、“买球”、“赔率”、“盘口”、“红单”、“黑单”、“盈利”、“赚钱”、“博彩”、“投资”、“回报”等敏感词汇。请使用“数据模型”、“核心方向”、“推演”、“预期价值”、“数据反馈”、“量化指标”、“基本面”等词汇。
+要求：包含具体赛程分析，客观专业。不含“赌博、赚钱”等敏感词。
 `;
 
   try {
@@ -332,7 +434,8 @@ You MUST return ONLY valid JSON matching this exact structure:
           bestOverallPair = [ep1, ep2];
         }
 
-        if (totalOdds >= 2.0 && combinedProb > maxProbForValidOdds) {
+        // 寻找赔率大概在 1.7 到 4.0 之间的组合，首要前提是保证组合胜率最高（最稳）
+        if (totalOdds >= 1.7 && totalOdds <= 4.0 && combinedProb > maxProbForValidOdds) {
           maxProbForValidOdds = combinedProb;
           bestPair = [ep1, ep2];
         }

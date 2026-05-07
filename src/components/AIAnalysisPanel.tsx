@@ -13,7 +13,7 @@ interface AIAnalysisPanelProps {
 }
 
 const getRecommendationDisplay = (rec: string, match: Match) => {
-  const lp = match.letOdds?.letPoint;
+  const lp = match.letOdds?.letCount;
   const lpStr = lp && lp > 0 ? `+${lp}` : `${lp || 0}`;
 
   switch (rec) {

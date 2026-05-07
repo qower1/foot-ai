@@ -82,15 +82,15 @@ export function DataModelView({ params, onParamsChange }: DataModelViewProps) {
       <div className="max-w-6xl mx-auto space-y-8">
         
         {/* Header Section */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h2 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
-              <Database className="w-6 h-6 text-emerald-500" />
+            <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2">
+              <Database className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-500" />
               核心数据模型
             </h2>
-            <p className="text-zinc-400 mt-1">基于泊松分布与凯利准则的AI深度学习模型</p>
+            <p className="text-xs sm:text-sm text-zinc-400 mt-1">基于泊松分布与凯利准则的AI深度学习模型</p>
           </div>
-          <div className="flex gap-3">
+          <div className="flex flex-col sm:flex-row gap-3">
             <button 
               onClick={() => {
                 onParamsChange({
@@ -101,15 +101,15 @@ export function DataModelView({ params, onParamsChange }: DataModelViewProps) {
                 setChartData(initialPerformanceData);
                 setStats({ accuracy: 68.4, valueBets: 142, leagues: 86 });
               }}
-              className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition-colors flex items-center gap-2 text-sm font-medium"
+              className="flex-1 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition-colors flex items-center justify-center gap-2 text-sm font-medium"
             >
               <Settings2 className="w-4 h-4" />
-              模型参数重置
+              重置
             </button>
             <button 
               onClick={handleRetest}
               disabled={isRetesting}
-              className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 rounded-lg transition-colors flex items-center gap-2 text-sm font-bold shadow-[0_0_15px_rgba(16,185,129,0.2)] disabled:opacity-50"
+              className="flex-[2] px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm font-bold shadow-[0_0_15px_rgba(16,185,129,0.2)] disabled:opacity-50"
             >
               {isRetesting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
               {isRetesting ? '回测计算中...' : '应用并重新回测'}

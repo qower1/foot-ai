@@ -49,6 +49,79 @@ async function startServer() {
     }
   });
 
+  const apiFootballCache = new Map();
+
+  app.get('/api/football/fixtures', async (req, res) => {
+    const { date } = req.query; 
+    const apiKey = process.env.API_FOOTBALL_KEY || 'fe6cf972b7bd0cbf23960cd2360b30b0';
+    const cacheKey = `fixtures_${date}`;
+    
+    if (apiFootballCache.has(cacheKey)) {
+      return res.json(apiFootballCache.get(cacheKey));
+    }
+
+    try {
+      console.log(`Fetching fixtures from api-football for date: ${date}`);
+      const response = await fetch(`https://v3.football.api-sports.io/fixtures?date=${date}`, {
+        headers: { 'x-apisports-key': apiKey }
+      });
+      const data = await response.json() as any;
+      
+      if (data.errors && Object.keys(data.errors).length > 0) {
+        return res.status(400).json({ error: 'API Football error', details: data.errors });
+      }
+      
+      // Condense data
+      const condensed = (data.response || []).map((f: any) => ({
+        id: f.fixture.id,
+        time: f.fixture.date,
+        league: f.league.name,
+        country: f.league.country,
+        home: f.teams.home.name,
+        away: f.teams.away.name
+      }));
+      
+      apiFootballCache.set(cacheKey, condensed);
+      res.json(condensed);
+    } catch (error: any) {
+      console.error('Error fetching api-football fixtures:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/football/predictions', async (req, res) => {
+    const { fixture } = req.query;
+    const apiKey = process.env.API_FOOTBALL_KEY || 'fe6cf972b7bd0cbf23960cd2360b30b0';
+    const cacheKey = `predictions_${fixture}`;
+    
+    if (apiFootballCache.has(cacheKey)) {
+      return res.json(apiFootballCache.get(cacheKey));
+    }
+
+    try {
+      console.log(`Fetching predictions from api-football for fixture: ${fixture}`);
+      const response = await fetch(`https://v3.football.api-sports.io/predictions?fixture=${fixture}`, {
+        headers: { 'x-apisports-key': apiKey }
+      });
+      const data = await response.json() as any;
+      
+      if (data.errors && Object.keys(data.errors).length > 0) {
+        return res.status(400).json({ error: 'API Football error', details: data.errors });
+      }
+
+      if (!data.response || data.response.length === 0) {
+        return res.json(null);
+      }
+
+      const predictionData = data.response[0];
+      apiFootballCache.set(cacheKey, predictionData);
+      res.json(predictionData);
+    } catch (error: any) {
+      console.error('Error fetching api-football predictions:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get('/api/matches/html', async (req, res) => {
     try {
       console.log('Fetching matches from zgzcw...');

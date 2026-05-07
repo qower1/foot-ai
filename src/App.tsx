@@ -151,7 +151,7 @@ export default function App() {
 
   return (
     <div 
-      className="flex h-screen text-zinc-200 font-sans selection:bg-emerald-500/30 relative overflow-hidden"
+      className="flex flex-col md:flex-row h-[100dvh] text-zinc-200 font-sans selection:bg-emerald-500/30 relative overflow-hidden"
       style={{
         backgroundImage: 'linear-gradient(to bottom right, rgba(9, 9, 11, 0.85), rgba(9, 9, 11, 0.95)), url("https://images.unsplash.com/photo-1518605368461-1e1e38ce8058?q=80&w=2000&auto=format&fit=crop")',
         backgroundSize: 'cover',
@@ -161,50 +161,50 @@ export default function App() {
     >
       <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
       
-      <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative z-10">
+      <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative z-10 pb-[72px] md:pb-0">
         {activeTab === 'today' && (
           <>
-            <header className="h-20 border-b border-zinc-800/50 bg-zinc-900/40 backdrop-blur-md flex items-center justify-between px-8">
+            <header className="flex-col md:flex-row md:h-20 border-b border-zinc-800/50 bg-zinc-900/40 backdrop-blur-md flex md:items-center justify-between px-4 md:px-8 py-4 md:py-0 gap-4">
               <div>
-                <h1 className="text-2xl font-bold text-white tracking-tight">今日赛事分析</h1>
-                <p className="text-sm text-zinc-400 mt-1">{new Date().toLocaleDateString('zh-CN')} · 共 {matches.length} 场比赛</p>
+                <h1 className="text-xl md:text-2xl font-bold text-white tracking-tight">今日赛事分析</h1>
+                <p className="text-xs md:text-sm text-zinc-400 mt-1">{new Date().toLocaleDateString('zh-CN')} · 共 {matches.length} 场比赛</p>
               </div>
               
-              <div className="flex items-center gap-4">
+              <div className="flex flex-wrap items-center gap-2 md:gap-4">
                 <select 
-                  className="bg-zinc-800 border-zinc-700 text-zinc-300 text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 block px-3 py-2 outline-none cursor-pointer"
+                  className="bg-zinc-800 border-zinc-700 text-zinc-300 text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 block px-2 md:px-3 py-2 outline-none cursor-pointer flex-1 md:flex-none"
                   value={modelProvider}
                   onChange={(e) => setModelProvider(e.target.value as 'gemini' | 'deepseek')}
                 >
-                  <option value="gemini">Gemini 3.1 Pro</option>
-                  <option value="deepseek">DeepSeek V4 Pro</option>
+                  <option value="gemini">Gemini 3.1</option>
+                  <option value="deepseek">DeepSeek v4</option>
                 </select>
-                <div className="w-px h-8 bg-zinc-800 mx-1"></div>
+                <div className="hidden md:block w-px h-8 bg-zinc-800 mx-1"></div>
                 <button
                   onClick={handleFetchLiveMatches}
                   disabled={isFetching || isAnalyzing}
-                  className="flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-zinc-700"
+                  className="flex-1 md:flex-none flex items-center justify-center gap-2 px-3 md:px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm md:text-base font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-zinc-700"
                 >
                   <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
-                  {isFetching ? '获取中...' : '获取最新赛事'}
+                  <span className="md:inline">{isFetching ? '刷新中' : '刷新'}</span>
                 </button>
-                <div className="w-px h-8 bg-zinc-800 mx-2"></div>
+                <div className="hidden md:block w-px h-8 bg-zinc-800 mx-1"></div>
                 <button
                   onClick={handleAnalyze}
                   disabled={isAnalyzing || isFetching || matches.length === 0}
-                  className="flex items-center gap-2 px-6 py-3 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_20px_rgba(16,185,129,0.2)] hover:shadow-[0_0_30px_rgba(16,185,129,0.4)]"
+                  className="w-full md:w-auto flex items-center justify-center gap-2 px-4 md:px-6 py-2.5 md:py-3 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_20px_rgba(16,185,129,0.2)] hover:shadow-[0_0_30px_rgba(16,185,129,0.4)] mt-2 md:mt-0"
                 >
                   {isAnalyzing ? (
                     <Loader2 className="w-5 h-5 animate-spin" />
                   ) : (
                     <BrainCircuit className="w-5 h-5" />
                   )}
-                  {isAnalyzing ? 'AI 深度运算中...' : '启动 AI 分析'}
+                  {isAnalyzing ? '运算中...' : '启动分析'}
                 </button>
               </div>
             </header>
 
-            <div className="flex-1 overflow-y-auto p-8">
+            <div className="flex-1 overflow-y-auto p-4 md:p-8">
               <div className="max-w-5xl mx-auto">
                 <MatchList 
                   matches={matches} 
