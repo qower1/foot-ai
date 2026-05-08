@@ -16,7 +16,6 @@ export default defineConfig(({mode}) => {
         '@': path.resolve(__dirname, '.'),
         'formdata-polyfill/esm.min.js': path.resolve(__dirname, 'empty.js'),
         'formdata-polyfill': path.resolve(__dirname, 'empty.js'),
-        'node-fetch': path.resolve(__dirname, 'mock-fetch.js'),
       },
     },
     server: {

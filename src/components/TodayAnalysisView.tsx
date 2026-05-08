@@ -1,11 +1,10 @@
 import React, { useState, useRef } from 'react';
-import { Match, Prediction, BettingStrategy, HistoryRecord } from '../types';
+import { Match, Prediction, BettingStrategy, HistoryRecord, AnalysisRecord } from '../types';
 import { BrainCircuit, List, Share2, X, Download, Loader2, ShieldAlert, Target, TrendingUp, Copy, Check, FileText } from 'lucide-react';
 import { toPng } from 'html-to-image';
 
 interface TodayAnalysisViewProps {
-  matches: Match[];
-  analysisResult: { predictions: Prediction[], strategy: BettingStrategy, articleIntro?: string } | null;
+  analysisHistory: AnalysisRecord[];
   historyRecords: HistoryRecord[];
   initialBankroll: number;
 }
@@ -40,23 +39,40 @@ const getCompliantLabel = (rec: string) => {
   return labels[rec] || rec.toUpperCase();
 };
 
-export function TodayAnalysisView({ matches, analysisResult, historyRecords, initialBankroll }: TodayAnalysisViewProps) {
+export function TodayAnalysisView({ analysisHistory, historyRecords, initialBankroll }: TodayAnalysisViewProps) {
   const [showShareModal, setShowShareModal] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const shareCardRef = useRef<HTMLDivElement>(null);
 
+  const [selectedId, setSelectedId] = useState<string | null>(analysisHistory.length > 0 ? analysisHistory[0].id : null);
+  const prevHistoryLengthRef = useRef(analysisHistory.length);
+
+  React.useEffect(() => {
+    if (analysisHistory.length > 0) {
+      if (!analysisHistory.find(h => h.id === selectedId)) {
+        setSelectedId(analysisHistory[0].id);
+      } else if (analysisHistory.length > prevHistoryLengthRef.current) {
+        // A new analysis was added, auto-select it
+        setSelectedId(analysisHistory[0].id);
+      }
+    }
+    prevHistoryLengthRef.current = analysisHistory.length;
+  }, [analysisHistory, selectedId]);
+
+  const analysisResult = analysisHistory.find(h => h.id === selectedId) || null;
+
   if (!analysisResult) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 h-full">
         <BrainCircuit className="w-16 h-16 mb-4 text-zinc-700" />
-        <p className="text-lg font-medium text-zinc-400">暂无分析结果</p>
+        <p className="text-lg font-medium text-zinc-400">暂无历史分析结果</p>
         <p className="text-sm mt-2">请在“今日赛事”中点击“启动 AI 分析”获取最新预测。</p>
       </div>
     );
   }
 
-  const { predictions } = analysisResult;
+  const { predictions, matchesSnapshot: matches } = analysisResult;
   
   // Calculate historical accuracy for the share card
   const completed = historyRecords.filter(r => r.status !== 'pending');
@@ -158,9 +174,11 @@ export function TodayAnalysisView({ matches, analysisResult, historyRecords, ini
     }
   };
 
+  const analysisDateStr = analysisResult.timestamp ? new Date(analysisResult.timestamp).toLocaleDateString('zh-CN') : new Date().toLocaleDateString('zh-CN');
+
   const articleText = analysisResult.articleIntro
-    ? `【AI体育数据模型 - 每日推演】\n今天是 ${new Date().toLocaleDateString('zh-CN')}，AI引擎对今日的 ${predictions.length} 场核心赛事进行了深度推演。结合多维度数据交叉比对，最终精选出 ${recommendedPredictions.length} 场核心数据方向。\n\n${analysisResult.strategy.reasoning}\n\n${analysisResult.articleIntro}\n\n截至目前，本模型累计完成 ${completed.length} 场赛事推演，综合准确度稳定在 ${accuracy}%，平均期望指数 ${avgOdds}，模型整体表现指数达到 ${roiNum > 0 ? '+' : ''}${roi}。\n\n（注：本内容仅为AI技术测试与体育数据模型交流，纯属计算机算法研究，不构成任何建议，请理性参考。）`
-    : `【AI体育数据模型 - 每日推演】\n今天是 ${new Date().toLocaleDateString('zh-CN')}，AI引擎对今日的 ${predictions.length} 场核心赛事进行了深度推演。结合多维度数据交叉比对，最终精选出 ${recommendedPredictions.length} 场核心数据方向。\n\n${analysisResult.strategy.reasoning}\n\n截至目前，本模型累计完成 ${completed.length} 场赛事推演，综合准确度稳定在 ${accuracy}%，平均期望指数 ${avgOdds}，模型整体表现指数达到 ${roiNum > 0 ? '+' : ''}${roi}。\n\n（注：本内容仅为AI技术测试与体育数据模型交流，纯属计算机算法研究，不构成任何建议，请理性参考。）`;
+    ? `【AI体育数据模型 - 每日推演】\n今天是 ${analysisDateStr}，AI引擎对今日的 ${predictions.length} 场核心赛事进行了深度推演。结合多维度数据交叉比对，最终精选出 ${recommendedPredictions.length} 场核心数据方向。\n\n${analysisResult.strategy.reasoning}\n\n${analysisResult.articleIntro}\n\n截至目前，本模型累计完成 ${completed.length} 场赛事推演，综合准确度稳定在 ${accuracy}%，平均期望指数 ${avgOdds}，模型整体表现指数达到 ${roiNum > 0 ? '+' : ''}${roi}。\n\n（注：本内容仅为AI技术测试与体育数据模型交流，纯属计算机算法研究，不构成任何建议，请理性参考。）`
+    : `【AI体育数据模型 - 每日推演】\n今天是 ${analysisDateStr}，AI引擎对今日的 ${predictions.length} 场核心赛事进行了深度推演。结合多维度数据交叉比对，最终精选出 ${recommendedPredictions.length} 场核心数据方向。\n\n${analysisResult.strategy.reasoning}\n\n截至目前，本模型累计完成 ${completed.length} 场赛事推演，综合准确度稳定在 ${accuracy}%，平均期望指数 ${avgOdds}，模型整体表现指数达到 ${roiNum > 0 ? '+' : ''}${roi}。\n\n（注：本内容仅为AI技术测试与体育数据模型交流，纯属计算机算法研究，不构成任何建议，请理性参考。）`;
 
   const handleCopyText = async () => {
     try {
@@ -180,17 +198,30 @@ export function TodayAnalysisView({ matches, analysisResult, historyRecords, ini
           <div>
             <h2 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
               <BrainCircuit className="w-6 h-6 text-emerald-400" />
-              今日全场次分析结果
+              历史分析记录
             </h2>
-            <p className="text-zinc-400 mt-1">AI对今日所有赛事的深度解读与预测</p>
+            <p className="text-zinc-400 mt-1">AI对赛事的深度解读与预测历史</p>
           </div>
-          <button 
-            onClick={() => setShowShareModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-medium rounded-lg transition-colors border border-emerald-500/20"
-          >
-            <Share2 className="w-4 h-4" />
-            生成小红书分享图
-          </button>
+          <div className="flex items-center gap-4">
+            <select
+              className="bg-zinc-800 border border-zinc-700 text-zinc-300 text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 block px-3 py-2 outline-none cursor-pointer"
+              value={selectedId || ''}
+              onChange={(e) => setSelectedId(e.target.value)}
+            >
+              {analysisHistory.map((history) => (
+                <option key={history.id} value={history.id}>
+                  {new Date(history.timestamp).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })} ({history.predictions.length}场)
+                </option>
+              ))}
+            </select>
+            <button 
+              onClick={() => setShowShareModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-medium rounded-lg transition-colors border border-emerald-500/20"
+            >
+              <Share2 className="w-4 h-4" />
+              生成小红书分享图
+            </button>
+          </div>
         </div>
 
         {/* Article Intro Block */}
@@ -344,7 +375,7 @@ export function TodayAnalysisView({ matches, analysisResult, historyRecords, ini
                   </div>
                   <div className="text-right">
                     <div className="text-[36px] font-black text-white mb-1 tracking-tighter">
-                      {new Date().toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' }).replace('/', '.')}
+                      {analysisResult.timestamp ? new Date(analysisResult.timestamp).toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' }).replace('/', '.') : new Date().toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' }).replace('/', '.')}
                     </div>
                     <div className="text-lg text-zinc-500 font-mono tracking-widest uppercase">v2.0 Engine</div>
                   </div>

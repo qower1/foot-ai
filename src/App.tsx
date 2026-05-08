@@ -19,9 +19,30 @@ export default function App() {
   const [matches, setMatches] = useState<Match[]>(mockMatches);
   const [isFetching, setIsFetching] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState<{ predictions: Prediction[], strategy: BettingStrategy, articleIntro?: string } | null>(() => {
-    const saved = localStorage.getItem('analysis_result');
-    return saved ? JSON.parse(saved) : null;
+  const [analysisResult, setAnalysisResult] = useState<{ predictions: Prediction[], strategy: BettingStrategy, articleIntro?: string } | null>(null);
+  const [analysisHistory, setAnalysisHistory] = useState<import('./types').AnalysisRecord[]>(() => {
+    const saved = localStorage.getItem('analysis_history');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        return [];
+      }
+    }
+    // Attempt migration from old analysis_result
+    const oldSaved = localStorage.getItem('analysis_result');
+    if (oldSaved) {
+      try {
+        const parsed = JSON.parse(oldSaved);
+        return [{
+          id: Date.now().toString(),
+          timestamp: new Date().toISOString(),
+          ...parsed,
+          matchesSnapshot: mockMatches
+        }];
+      } catch (e) {}
+    }
+    return [];
   });
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
   const [historyRecords, setHistoryRecords] = useState<HistoryRecord[]>(() => {
@@ -72,12 +93,8 @@ export default function App() {
   }, [modelParams]);
 
   useEffect(() => {
-    if (analysisResult) {
-      localStorage.setItem('analysis_result', JSON.stringify(analysisResult));
-    } else {
-      localStorage.removeItem('analysis_result');
-    }
-  }, [analysisResult]);
+    localStorage.setItem('analysis_history', JSON.stringify(analysisHistory));
+  }, [analysisHistory]);
 
   const handleFetchLiveMatches = async () => {
     setIsFetching(true);
@@ -85,7 +102,7 @@ export default function App() {
       const liveMatches = await fetchLiveMatches();
       if (liveMatches && liveMatches.length > 0) {
         setMatches(liveMatches);
-        setAnalysisResult(null); // Clear previous analysis
+        setAnalysisResult(null); // Clear previous active popup
       } else {
         alert('获取到的赛事数据为空。');
       }
@@ -102,6 +119,14 @@ export default function App() {
     try {
       const result = await analyzeMatches(matches, modelParams, modelProvider);
       setAnalysisResult(result);
+      
+      const newRecord: import('./types').AnalysisRecord = {
+        id: Date.now().toString(),
+        timestamp: new Date().toISOString(),
+        ...result,
+        matchesSnapshot: JSON.parse(JSON.stringify(matches))
+      };
+      setAnalysisHistory(prev => [newRecord, ...prev]);
     } catch (error) {
       console.error('Failed to analyze matches:', error);
       alert('AI分析失败，请检查网络或API Key设置。');
@@ -238,7 +263,7 @@ export default function App() {
 
         {activeTab === 'model' && <DataModelView params={modelParams} onParamsChange={setModelParams} />}
         
-        {activeTab === 'analysis' && <TodayAnalysisView matches={matches} analysisResult={analysisResult} historyRecords={historyRecords} initialBankroll={initialBankroll} />}
+        {activeTab === 'analysis' && <TodayAnalysisView analysisHistory={analysisHistory} historyRecords={historyRecords} initialBankroll={initialBankroll} />}
         
         {activeTab === 'history' && (
           <HistoryView 

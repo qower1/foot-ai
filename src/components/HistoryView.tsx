@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { HistoryRecord } from '../types';
-import { Trophy, Calendar, TrendingUp, CheckCircle2, XCircle, Clock, Trash2, Target, BarChart3, LineChart as LineChartIcon } from 'lucide-react';
+import { Trophy, Calendar, TrendingUp, CheckCircle2, XCircle, Clock, Trash2, Target, BarChart3, LineChart as LineChartIcon, Download } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 
 interface HistoryViewProps {
@@ -104,6 +104,59 @@ export function HistoryView({ records, initialBankroll, onDeleteRecord, onUpdate
     };
   }, [records, initialBankroll]);
 
+  const handleExportCsv = () => {
+    const headers = ['日期', '联赛', '场次', '推荐方向', '投入金额(元)', '组合赔率', '赛果', '盈亏(元)'];
+    
+    const rows = records.map(record => {
+      const date = new Date(record.date).toLocaleString('zh-CN');
+      
+      const leagues = record.predictions.map(p => {
+        const match = record.matches?.find(m => m.id === p.matchId);
+        return match?.league || '-';
+      }).join(' / ');
+      
+      const matchesText = record.predictions.map(p => {
+        const match = record.matches?.find(m => m.id === p.matchId);
+        return match ? `${match.homeTeam} vs ${match.awayTeam}` : '未知';
+      }).join(' / ');
+      
+      const recommendations = record.predictions.map(p => getRecommendationLabel(p.recommendation)).join(' / ');
+      const stake = record.strategy.suggestedStake.toFixed(2);
+      const odds = record.strategy.totalOdds.toFixed(2);
+      
+      const resultStr = record.status === 'won' ? '红' : record.status === 'lost' ? '黑' : '待定';
+      
+      let pnl = '0.00';
+      if (record.status === 'won') {
+        pnl = (Number(stake) * (Number(odds) - 1)).toFixed(2);
+      } else if (record.status === 'lost') {
+        pnl = `-${stake}`;
+      }
+      
+      return [
+        `"${date}"`,
+        `"${leagues}"`,
+        `"${matchesText}"`,
+        `"${recommendations}"`,
+        stake,
+        odds,
+        `"${resultStr}"`,
+        pnl
+      ].join(',');
+    });
+    
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `实战记录_${new Date().toLocaleDateString('zh-CN').replace(/\//g, '')}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   if (records.length === 0) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 h-full">
@@ -125,15 +178,24 @@ export function HistoryView({ records, initialBankroll, onDeleteRecord, onUpdate
             </h2>
             <p className="text-xs sm:text-sm text-zinc-400 mt-1">追踪您的AI推荐历史与盈亏表现</p>
           </div>
-          {onClearAllRecords && (
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <button
-              onClick={onClearAllRecords}
-              className="w-full sm:w-auto flex justify-center items-center gap-2 px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-medium rounded-lg transition-colors border border-rose-500/20"
+              onClick={handleExportCsv}
+              className="flex-1 sm:flex-none flex justify-center items-center gap-2 px-4 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-medium rounded-lg transition-colors border border-emerald-500/20"
             >
-              <Trash2 className="w-4 h-4" />
-              清空记录
+              <Download className="w-4 h-4" />
+              导出 CSV
             </button>
-          )}
+            {onClearAllRecords && (
+              <button
+                onClick={onClearAllRecords}
+                className="flex-1 sm:flex-none flex justify-center items-center gap-2 px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-medium rounded-lg transition-colors border border-rose-500/20"
+              >
+                <Trash2 className="w-4 h-4" />
+                清空记录
+              </button>
+            )}
+          </div>
         </div>
 
         {/* 详细实战数据分析 */}
@@ -243,118 +305,91 @@ export function HistoryView({ records, initialBankroll, onDeleteRecord, onUpdate
           </div>
         )}
 
-        <div className="space-y-4">
-          {records.map((record) => (
-            <div key={record.id} className="bg-zinc-900/60 backdrop-blur-md border border-zinc-800/50 rounded-xl p-6 transition-all hover:border-zinc-700/50">
-              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-zinc-800 rounded-lg shrink-0">
-                    <Calendar className="w-5 h-5 text-zinc-400" />
-                  </div>
-                  <div>
-                    <h3 className="text-base sm:text-lg font-bold text-white">
-                      {new Date(record.date).toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                    </h3>
-                    <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm mt-1">
-                      <span className="text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded font-medium">
-                        {record.strategy.type === 'single' ? '单关价值投' : '高赔率串关'}
-                      </span>
-                      <span className="text-zinc-500">包含 {record.predictions.length} 场预测</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto mt-2 sm:mt-0">
-                  <select
-                    value={record.status}
-                    onChange={(e) => onUpdateStatus(record.id, e.target.value as any)}
-                    className={`text-sm font-bold px-3 py-1.5 rounded-lg border outline-none appearance-none cursor-pointer ${
-                      record.status === 'won' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-                      record.status === 'lost' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' :
-                      'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                    }`}
-                  >
-                    <option value="pending" className="bg-zinc-900 text-amber-400">待开奖 (Pending)</option>
-                    <option value="won" className="bg-zinc-900 text-emerald-400">红单 (Won)</option>
-                    <option value="lost" className="bg-zinc-900 text-rose-400">黑单 (Lost)</option>
-                  </select>
+        <div className="bg-zinc-900/60 backdrop-blur-md border border-zinc-800/50 rounded-xl overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="text-xs uppercase bg-zinc-800/50 text-zinc-400">
+                <tr>
+                  <th className="px-4 py-3 whitespace-nowrap">日期</th>
+                  <th className="px-4 py-3 whitespace-nowrap">联赛</th>
+                  <th className="px-4 py-3 min-w-[200px]">场次</th>
+                  <th className="px-4 py-3 whitespace-nowrap">推荐方向</th>
+                  <th className="px-4 py-3 whitespace-nowrap text-right">投入金额</th>
+                  <th className="px-4 py-3 whitespace-nowrap text-right">组合赔率</th>
+                  <th className="px-4 py-3 whitespace-nowrap">赛果</th>
+                  <th className="px-4 py-3 whitespace-nowrap text-right">盈亏</th>
+                  <th className="px-4 py-3 whitespace-nowrap text-center">操作</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-800/50">
+                {records.map((record) => {
+                  const date = new Date(record.date).toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' });
                   
-                  <button 
-                    onClick={() => onDeleteRecord(record.id)}
-                    className="p-2.5 sm:p-2 text-zinc-500 hover:text-rose-400 hover:bg-rose-400/10 rounded-lg transition-colors border border-transparent hover:border-rose-500/20"
-                    title="删除记录"
-                  >
-                    <Trash2 className="w-5 h-5 sm:w-4 sm:h-4" />
-                  </button>
-                </div>
-              </div>
+                  const leagues = record.predictions.map(p => {
+                    const match = record.matches?.find(m => m.id === p.matchId);
+                    return match?.league || '-';
+                  }).join(', ');
+                  
+                  const matchesText = record.predictions.map((p, i) => {
+                    const match = record.matches?.find(m => m.id === p.matchId);
+                    return <div key={i} className="truncate">{match ? `${match.homeTeam} vs ${match.awayTeam}` : '未知'}</div>;
+                  });
+                  
+                  const recommendations = record.predictions.map((p, i) => (
+                    <div key={i}>{getRecommendationLabel(p.recommendation)}</div>
+                  ));
+                  
+                  const stake = record.strategy.suggestedStake.toFixed(2);
+                  const odds = record.strategy.totalOdds.toFixed(2);
+                  
+                  let pnl = 0;
+                  if (record.status === 'won') {
+                    pnl = Number(stake) * (Number(odds) - 1);
+                  } else if (record.status === 'lost') {
+                    pnl = -Number(stake);
+                  }
 
-              <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-4 p-3 sm:p-4 bg-zinc-800/30 rounded-lg border border-zinc-800">
-                <div>
-                  <span className="block text-xs text-zinc-500 mb-1">组合赔率</span>
-                  <span className="font-mono font-bold text-white">{record.strategy.totalOdds.toFixed(2)}</span>
-                </div>
-                <div>
-                  <span className="block text-xs text-zinc-500 mb-1">建议仓位</span>
-                  <span className="font-mono font-bold text-rose-400">{(record.strategy.suggestedStake * 100).toFixed(1)}%</span>
-                </div>
-                <div>
-                  <span className="block text-xs text-zinc-500 mb-1">预期回报</span>
-                  <span className="font-mono font-bold text-emerald-400">{(record.strategy.expectedReturn * 100).toFixed(1)}%</span>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <h4 className="text-sm font-medium text-zinc-400 flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4" />
-                  策略逻辑
-                </h4>
-                <p className="text-sm text-zinc-300 leading-relaxed bg-zinc-800/50 p-3 rounded-lg border border-zinc-700/50">
-                  {record.strategy.reasoning}
-                </p>
-              </div>
-
-              <div className="mt-4 space-y-2">
-                <h4 className="text-sm font-medium text-zinc-400 flex items-center gap-2">
-                  <Target className="w-4 h-4" />
-                  推荐详情
-                </h4>
-                <div className="space-y-2">
-                  {record.strategy.matches.map((matchId) => {
-                    const pred = record.predictions.find(p => p.matchId === matchId);
-                    const match = record.matches?.find(m => m.id === matchId);
-                    if (!pred) return null;
-                    
-                    return (
-                      <div key={matchId} className="bg-zinc-800/30 rounded-lg p-3 border border-zinc-800 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
-                        <div className="flex flex-col">
-                          <span className="text-sm text-zinc-300">
-                            {match ? (
-                              <>
-                                {match.matchNum && <span className="text-zinc-500 mr-2 font-mono">[{match.matchNum}]</span>}
-                                {match.homeTeam} vs {match.awayTeam}
-                              </>
-                            ) : (
-                              <span className="font-mono text-zinc-500">ID: {matchId}</span>
-                            )}
-                          </span>
-                          <span className="text-xs text-zinc-500 mt-1">{pred.reasoning}</span>
-                        </div>
-                        <div className="flex items-center gap-3 shrink-0">
-                          <span className="text-xs text-zinc-400">EV: {pred.expectedValue > 1 ? pred.expectedValue.toFixed(2) : '-'}</span>
-                          <span className={`text-xs font-bold px-2 py-1 rounded ${
-                            pred.recommendation === 'pass' ? 'bg-zinc-700 text-zinc-300' : 'bg-emerald-500/20 text-emerald-400'
-                          }`}>
-                            {getRecommendationLabel(pred.recommendation)}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          ))}
+                  return (
+                    <tr key={record.id} className="hover:bg-zinc-800/20 transition-colors group">
+                      <td className="px-4 py-3 whitespace-nowrap text-zinc-300">{date}</td>
+                      <td className="px-4 py-3 whitespace-nowrap text-zinc-400">{leagues}</td>
+                      <td className="px-4 py-3 text-zinc-300 font-medium">{matchesText}</td>
+                      <td className="px-4 py-3 whitespace-nowrap text-emerald-400/90 font-medium">{recommendations}</td>
+                      <td className="px-4 py-3 whitespace-nowrap text-right font-mono text-zinc-300">{stake}</td>
+                      <td className="px-4 py-3 whitespace-nowrap text-right font-mono text-amber-400/90">{odds}</td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <select
+                          value={record.status}
+                          onChange={(e) => onUpdateStatus(record.id, e.target.value as any)}
+                          className={`text-xs font-bold px-2 py-1 rounded border outline-none appearance-none cursor-pointer ${
+                            record.status === 'won' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                            record.status === 'lost' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' :
+                            'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                          }`}
+                        >
+                          <option value="pending" className="bg-zinc-900 text-amber-400">待定</option>
+                          <option value="won" className="bg-zinc-900 text-emerald-400">红</option>
+                          <option value="lost" className="bg-zinc-900 text-rose-400">黑</option>
+                        </select>
+                      </td>
+                      <td className={`px-4 py-3 whitespace-nowrap text-right font-bold font-mono ${pnl > 0 ? 'text-emerald-400' : pnl < 0 ? 'text-rose-400' : 'text-zinc-500'}`}>
+                        {record.status === 'pending' ? '-' : `${pnl > 0 ? '+' : ''}${pnl.toFixed(2)}`}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-center">
+                        <button 
+                          onClick={() => onDeleteRecord(record.id)}
+                          className="p-1.5 text-zinc-500 hover:text-rose-400 hover:bg-rose-400/10 rounded transition-colors opacity-0 group-hover:opacity-100"
+                          title="删除记录"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>

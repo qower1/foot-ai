@@ -49,6 +49,34 @@ async function startServer() {
     }
   });
 
+  app.post('/api/gemini/generate', async (req, res) => {
+    try {
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        return res.status(400).json({ error: 'Gemini API Key is missing. Please add it to your environment variables.' });
+      }
+
+      console.log('Forwarding request to Gemini API...');
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(req.body)
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Gemini API error:', response.status, errorText);
+        return res.status(response.status).json({ error: `Gemini API failed: ${response.status}`, details: errorText });
+      }
+
+      const data = await response.json();
+      res.json(data);
+    } catch (error: any) {
+      console.error('Error in /api/gemini/generate:', error);
+      res.status(500).json({ error: 'Failed to connect to Gemini API', details: error.message });
+    }
+  });
+
   const apiFootballCache = new Map();
 
   app.get('/api/football/fixtures', async (req, res) => {

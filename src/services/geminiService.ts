@@ -1,9 +1,6 @@
-import { GoogleGenAI, Type } from '@google/genai';
 import { Match, Prediction, BettingStrategy } from '../types';
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-
-async function matchFixturesWithLLM(matches: Match[], footballFixtures: any[], aiModel: GoogleGenAI): Promise<Record<string, number>> {
+async function matchFixturesWithLLM(matches: Match[], footballFixtures: any[], modelProvider: 'gemini' | 'deepseek' = 'gemini'): Promise<Record<string, number>> {
   if (!footballFixtures || footballFixtures.length === 0) return {};
   
   const prompt = `
@@ -21,34 +18,87 @@ async function matchFixturesWithLLM(matches: Match[], footballFixtures: any[], a
   `;
   
   try {
-    const response = await aiModel.models.generateContent({
-      model: 'gemini-3.1-pro-preview',
-      contents: prompt,
-      config: {
-        temperature: 0.1,
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            mappings: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  matchId: { type: Type.STRING },
-                  fixtureId: { type: Type.INTEGER }
-                },
-                required: ['matchId', 'fixtureId']
-              }
-            }
-          },
-          required: ['mappings']
-        }
-      }
-    });
+    let text = '';
     
-    if (!response.text) return {};
-    const parsed = JSON.parse(response.text);
+    if (modelProvider === 'deepseek') {
+      const explicitSchemaStr = `
+Please output a raw JSON object only. The JSON must exactly match the structure:
+{
+  "mappings": [
+    {
+      "matchId": "string",
+      "fixtureId": 0
+    }
+  ]
+}
+`;
+      const dsRes = await fetch('/api/deepseek', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'deepseek-chat',
+          messages: [
+            {
+              role: 'system',
+              content: 'You are an expert sports data matcher. ' + explicitSchemaStr
+            },
+            {
+              role: 'user',
+              content: prompt
+            }
+          ],
+          response_format: { type: 'json_object' },
+          temperature: 0.1
+        })
+      });
+
+      if (!dsRes.ok) {
+        throw new Error("DeepSeek API failed: " + dsRes.status);
+      }
+      const dsData = await dsRes.json();
+      text = dsData.choices[0]?.message?.content || '';
+    } else {
+      const response = await fetch("/api/gemini/generate", {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.1,
+            responseMimeType: 'application/json',
+            responseSchema: {
+              type: "OBJECT",
+              properties: {
+                mappings: {
+                  type: "ARRAY",
+                  items: {
+                    type: "OBJECT",
+                    properties: {
+                      matchId: { type: "STRING" },
+                      fixtureId: { type: "INTEGER" }
+                    },
+                    required: ['matchId', 'fixtureId']
+                  }
+                }
+              },
+              required: ['mappings']
+            }
+          }
+        })
+      });
+      
+      if (!response.ok) {
+          throw new Error("Gemini API failed: " + response.status);
+      }
+      const data = await response.json();
+      text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    }
+    
+    if (!text) return {};
+    if (text.startsWith('\`\`\`json')) {
+      text = text.replace(/^\`\`\`json\n/, '').replace(/\n\`\`\`$/, '');
+    }
+    const parsed = JSON.parse(text);
     const mapping: Record<string, number> = {};
     for (const item of parsed.mappings || []) {
       mapping[item.matchId] = item.fixtureId;
@@ -59,6 +109,7 @@ async function matchFixturesWithLLM(matches: Match[], footballFixtures: any[], a
     return {};
   }
 }
+
 
 export async function fetchLiveMatches(): Promise<Match[]> {
   try {
@@ -156,7 +207,7 @@ export async function analyzeMatches(
         const fixtures = await fixRes.json();
         
         // Match them
-        const mappings = await matchFixturesWithLLM(matches, fixtures, ai);
+        const mappings = await matchFixturesWithLLM(matches, fixtures, modelProvider);
         
         // Fetch predictions
         const predictionPromises = Object.entries(mappings).map(async ([matchId, fixtureId]) => {
@@ -296,59 +347,66 @@ You MUST return ONLY valid JSON matching this exact structure:
       text = dsData.choices[0]?.message?.content || '';
 
     } else {
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.1-pro-preview',
-        contents: prompt,
-        config: {
-          temperature: 0.2,
-          topK: 1,
-          topP: 0.95,
-          tools: [{ googleSearch: {} }],
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              matchAnalyses: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    matchId: { type: Type.STRING },
-                    recommendation: { type: Type.STRING },
-                    adjustedProbabilities: {
-                      type: Type.OBJECT,
-                      properties: {
-                        home: { type: Type.NUMBER },
-                        draw: { type: Type.NUMBER },
-                        away: { type: Type.NUMBER }
+      const resp = await fetch("/api/gemini/generate", {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.2,
+            topK: 1,
+            topP: 0.95,
+            responseMimeType: 'application/json',
+            responseSchema: {
+              type: "OBJECT",
+              properties: {
+                matchAnalyses: {
+                  type: "ARRAY",
+                  items: {
+                    type: "OBJECT",
+                    properties: {
+                      matchId: { type: "STRING" },
+                      recommendation: { type: "STRING" },
+                      adjustedProbabilities: {
+                        type: "OBJECT",
+                        properties: {
+                          home: { type: "NUMBER" },
+                          draw: { type: "NUMBER" },
+                          away: { type: "NUMBER" }
+                        },
+                        required: ['home', 'draw', 'away']
                       },
-                      required: ['home', 'draw', 'away']
+                      confidence: { type: "NUMBER" },
+                      reasoning: { type: "STRING" },
+                      expectedValue: { type: "NUMBER" },
+                      goalsData: { type: "STRING" },
+                      h2hData: { type: "STRING" },
+                      scheduleData: { type: "STRING" },
+                      clvPotential: { type: "STRING" }
                     },
-                    confidence: { type: Type.NUMBER },
-                    reasoning: { type: Type.STRING },
-                    expectedValue: { type: Type.NUMBER },
-                    goalsData: { type: Type.STRING },
-                    h2hData: { type: Type.STRING },
-                    scheduleData: { type: Type.STRING },
-                    clvPotential: { type: Type.STRING }
-                  },
-                  required: ['matchId', 'recommendation', 'adjustedProbabilities', 'confidence', 'reasoning', 'expectedValue', 'goalsData', 'h2hData', 'scheduleData', 'clvPotential']
-                }
+                    required: ['matchId', 'recommendation', 'adjustedProbabilities', 'confidence', 'reasoning', 'expectedValue', 'goalsData', 'h2hData', 'scheduleData', 'clvPotential']
+                  }
+                },
+                articleIntro: { type: "STRING" }
               },
-              articleIntro: { type: Type.STRING }
-            },
-            required: ['matchAnalyses', 'articleIntro']
-          }
-        }
+              required: ['matchAnalyses', 'articleIntro']
+            }
+          },
+          tools: [{ googleSearch: {} }]
+        })
       });
-      text = response.text || '';
+      if (!resp.ok) {
+        throw new Error("Gemini API failed: " + resp.status);
+      }
+      const data = await resp.json();
+      text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
     }
 
     if (!text) throw new Error('No response from AI');
     
     // Sometimes DeepSeek returns markdown wrapped JSON
-    if (text.startsWith('\`\`\`json')) {
-      text = text.replace(/^\`\`\`json\n/, '').replace(/\n\`\`\`$/, '');
+    if (text.startsWith('```json')) {
+      text = text.replace(/^```json\n/, '').replace(/\n```$/, '');
     }
     
     const aiResult = JSON.parse(text);

@@ -45,6 +45,15 @@ export interface Prediction {
   clvPotential?: string;
 }
 
+export interface AnalysisRecord {
+  id: string;
+  timestamp: string;
+  predictions: Prediction[];
+  strategy: BettingStrategy;
+  articleIntro?: string;
+  matchesSnapshot: Match[];
+}
+
 export interface BettingStrategy {
   date: string;
   type: 'single' | 'accumulator'; // 单关 / 串关
