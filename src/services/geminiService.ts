@@ -199,10 +199,12 @@ export async function analyzeMatches(
   try {
     if (matches.length > 0) {
       const d = new Date();
-      // Adjust to UTC since API-Football uses UTC dates
-      const dateStr = [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('-');
+      // Use Beijing time date to match zgzcw dates
+      const utc = d.getTime() + (d.getTimezoneOffset() * 60000);
+      const bjTime = new Date(utc + (3600000 * 8));
+      const dateStr = [bjTime.getFullYear(), String(bjTime.getMonth() + 1).padStart(2, '0'), String(bjTime.getDate()).padStart(2, '0')].join('-');
       
-      const fixRes = await fetch(`/api/football/fixtures?date=${dateStr}`);
+      const fixRes = await fetch(`/api/football/fixtures?date=${dateStr}&timezone=Asia/Shanghai`);
       if (fixRes.ok) {
         const fixtures = await fixRes.json();
         
@@ -210,13 +212,16 @@ export async function analyzeMatches(
         const mappings = await matchFixturesWithLLM(matches, fixtures, modelProvider);
         
         // Fetch predictions
-        const predictionPromises = Object.entries(mappings).map(async ([matchId, fixtureId]) => {
+        const predictionPromises = Object.entries(mappings).map(async ([matchId, fixtureId], index) => {
+          // Add a staggered delay to prevent hitting concurrent rate limits on api-football
+          await new Promise(resolve => setTimeout(resolve, index * 200));
           const predRes = await fetch(`/api/football/predictions?fixture=${fixtureId}`);
           if (predRes.ok) {
             const predData = await predRes.json();
             return { matchId, predData };
           } else {
-            console.warn(`Failed to fetch api-football predictions for fixture=${fixtureId}:`, predRes.status);
+            const err = await predRes.json().catch(() => ({}));
+            console.warn(`Failed to fetch api-football predictions for fixture=${fixtureId}:`, predRes.status, err);
           }
           return null;
         });

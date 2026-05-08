@@ -161,18 +161,18 @@ export function HistoryView({ records, initialBankroll, onDeleteRecord, onUpdate
       const pnlFormatted = record.status === 'pending' ? '0.00' : details.pnl.toFixed(2);
       
       // bg-rose-500/10 vs bg-emerald-500/10 -> equivalent colors for excel
-      const rowClass = record.status === 'won' ? 'won' : record.status === 'lost' ? 'lost' : '';
+      const rowStyle = record.status === 'won' ? 'background-color: #ffe4e6; color: #e11d48;' : record.status === 'lost' ? 'background-color: #d1fae5; color: #059669;' : '';
       
       return `
-        <tr class="${rowClass}">
-          <td>${date}</td>
-          <td>${leagues}</td>
-          <td>${matchesText}</td>
-          <td>${recommendations}</td>
-          <td style="mso-number-format:'0.00';">${stakeFormatted}</td>
-          <td style="mso-number-format:'0.00';">${odds}</td>
-          <td class="bold">${resultStr}</td>
-          <td class="bold" style="mso-number-format:'0.00';">${pnlFormatted}</td>
+        <tr style="${rowStyle}">
+          <td style="white-space: nowrap; border: 1px solid #ccc;">${date}</td>
+          <td style="white-space: nowrap; border: 1px solid #ccc;">${leagues}</td>
+          <td style="white-space: nowrap; border: 1px solid #ccc;">${matchesText}</td>
+          <td style="white-space: nowrap; border: 1px solid #ccc;">${recommendations}</td>
+          <td style="white-space: nowrap; border: 1px solid #ccc; mso-number-format:'0.00';">${stakeFormatted}</td>
+          <td style="white-space: nowrap; border: 1px solid #ccc; mso-number-format:'0.00';">${odds}</td>
+          <td style="white-space: nowrap; border: 1px solid #ccc; font-weight: bold;">${resultStr}</td>
+          <td style="white-space: nowrap; border: 1px solid #ccc; font-weight: bold; mso-number-format:'0.00';">${pnlFormatted}</td>
         </tr>
       `;
     });
@@ -199,25 +199,20 @@ export function HistoryView({ records, initialBankroll, onDeleteRecord, onUpdate
         <![endif]-->
         <style>
           table { border-collapse: collapse; font-family: sans-serif; white-space: nowrap; }
-          th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-          .won { background-color: #ffe4e6; color: #e11d48; }
-          .lost { background-color: #d1fae5; color: #059669; }
-          .bold { font-weight: bold; }
-          th { background-color: #f4f4f5; color: #3f3f46; font-weight: bold; }
         </style>
       </head>
       <body>
         <table>
           <thead>
             <tr>
-              <th>日期</th>
-              <th>联赛</th>
-              <th>场次</th>
-              <th>推荐方向</th>
-              <th>投入金额(元)</th>
-              <th>组合赔率</th>
-              <th>赛果</th>
-              <th>盈亏(元)</th>
+              <th style="background-color: #f4f4f5; color: #3f3f46; font-weight: bold; border: 1px solid #ccc; padding: 8px; white-space: nowrap;">日期</th>
+              <th style="background-color: #f4f4f5; color: #3f3f46; font-weight: bold; border: 1px solid #ccc; padding: 8px; white-space: nowrap;">联赛</th>
+              <th style="background-color: #f4f4f5; color: #3f3f46; font-weight: bold; border: 1px solid #ccc; padding: 8px; white-space: nowrap;">场次</th>
+              <th style="background-color: #f4f4f5; color: #3f3f46; font-weight: bold; border: 1px solid #ccc; padding: 8px; white-space: nowrap;">推荐方向</th>
+              <th style="background-color: #f4f4f5; color: #3f3f46; font-weight: bold; border: 1px solid #ccc; padding: 8px; white-space: nowrap;">投入金额(元)</th>
+              <th style="background-color: #f4f4f5; color: #3f3f46; font-weight: bold; border: 1px solid #ccc; padding: 8px; white-space: nowrap;">组合赔率</th>
+              <th style="background-color: #f4f4f5; color: #3f3f46; font-weight: bold; border: 1px solid #ccc; padding: 8px; white-space: nowrap;">赛果</th>
+              <th style="background-color: #f4f4f5; color: #3f3f46; font-weight: bold; border: 1px solid #ccc; padding: 8px; white-space: nowrap;">盈亏(元)</th>
             </tr>
           </thead>
           <tbody>
@@ -225,11 +220,11 @@ export function HistoryView({ records, initialBankroll, onDeleteRecord, onUpdate
           </tbody>
           <tfoot>
             <tr style="background-color: #f4f4f5; font-weight: bold;">
-              <td colspan="4" style="text-align: right;">汇总：</td>
-              <td></td>
-              <td>均赔: ${stats.avgOdds.toFixed(2)}</td>
-              <td style="color: #059669;">胜率: ${stats.winRate.toFixed(1)}%</td>
-              <td style="color: ${stats.totalProfit > 0 ? '#e11d48' : stats.totalProfit < 0 ? '#059669' : '#3f3f46'};">
+              <td colspan="4" style="text-align: right; border: 1px solid #ccc; padding: 8px;">汇总：</td>
+              <td style="border: 1px solid #ccc;"></td>
+              <td style="border: 1px solid #ccc; padding: 8px; white-space: nowrap;">均赔: ${stats.avgOdds.toFixed(2)}</td>
+              <td style="color: #059669; border: 1px solid #ccc; padding: 8px; white-space: nowrap;">胜率: ${stats.winRate.toFixed(1)}%</td>
+              <td style="color: ${stats.totalProfit > 0 ? '#e11d48' : stats.totalProfit < 0 ? '#059669' : '#3f3f46'}; border: 1px solid #ccc; padding: 8px; white-space: nowrap;">
                 总盈亏: ${stats.totalProfit > 0 ? '+' : ''}${stats.totalProfit.toFixed(2)}
               </td>
             </tr>

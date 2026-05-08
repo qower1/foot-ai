@@ -80,17 +80,18 @@ async function startServer() {
   const apiFootballCache = new Map();
 
   app.get('/api/football/fixtures', async (req, res) => {
-    const { date } = req.query; 
+    const { date, timezone } = req.query; 
     const apiKey = process.env.API_FOOTBALL_KEY || 'fe6cf972b7bd0cbf23960cd2360b30b0';
-    const cacheKey = `fixtures_${date}`;
+    const tzQuery = timezone ? `&timezone=${timezone}` : '';
+    const cacheKey = `fixtures_${date}_${timezone || 'default'}`;
     
     if (apiFootballCache.has(cacheKey)) {
       return res.json(apiFootballCache.get(cacheKey));
     }
 
     try {
-      console.log(`Fetching fixtures from api-football for date: ${date}`);
-      const response = await fetch(`https://v3.football.api-sports.io/fixtures?date=${date}`, {
+      console.log(`Fetching fixtures from api-football for date: ${date}${timezone ? ` timezone: ${timezone}` : ''}`);
+      const response = await fetch(`https://v3.football.api-sports.io/fixtures?date=${date}${tzQuery}`, {
         headers: { 'x-apisports-key': apiKey }
       });
       const data = await response.json() as any;
