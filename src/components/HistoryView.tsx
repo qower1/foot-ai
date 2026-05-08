@@ -29,8 +29,13 @@ const getRecommendationLabel = (rec: string) => {
 export function HistoryView({ records, initialBankroll, onDeleteRecord, onUpdateStatus, onClearAllRecords }: HistoryViewProps) {
   const [chartType, setChartType] = useState<'cumulative' | 'daily' | 'monthly'>('cumulative');
 
+  // 只展示/记录 2串1 的推荐
+  const displayRecords = useMemo(() => {
+    return records.filter(r => r.strategy.matches.length === 2);
+  }, [records]);
+
   const stats = useMemo(() => {
-    const completed = records.filter(r => r.status !== 'pending');
+    const completed = displayRecords.filter(r => r.status !== 'pending');
     const won = completed.filter(r => r.status === 'won');
     const lost = completed.filter(r => r.status === 'lost');
     
@@ -52,7 +57,9 @@ export function HistoryView({ records, initialBankroll, onDeleteRecord, onUpdate
     const sortedCompleted = [...completed].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     sortedCompleted.forEach((record) => {
-      const stakeAmount = currentBankroll * record.strategy.suggestedStake;
+      const isPercent = record.strategy.suggestedStake <= 1 && record.strategy.suggestedStake > 0;
+      const stakeAmount = isPercent ? currentBankroll * record.strategy.suggestedStake : record.strategy.suggestedStake;
+      
       totalStake += stakeAmount;
       
       let profit = 0;
@@ -90,7 +97,7 @@ export function HistoryView({ records, initialBankroll, onDeleteRecord, onUpdate
     const avgOdds = won.length > 0 ? totalOddsWon / won.length : 0;
 
     return {
-      totalMatches: records.length,
+      totalMatches: displayRecords.length,
       completedMatches: completed.length,
       wonCount: won.length,
       lostCount: lost.length,
@@ -102,62 +109,149 @@ export function HistoryView({ records, initialBankroll, onDeleteRecord, onUpdate
       chartDataDaily,
       chartDataMonthly
     };
-  }, [records, initialBankroll]);
+  }, [displayRecords, initialBankroll]);
 
-  const handleExportCsv = () => {
-    const headers = ['日期', '联赛', '场次', '推荐方向', '投入金额(元)', '组合赔率', '赛果', '盈亏(元)'];
+  const recordDetails = useMemo(() => {
+    let bankroll = initialBankroll;
+    const sorted = [...displayRecords].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const map = new Map<string, { stake: number; pnl: number }>();
     
-    const rows = records.map(record => {
-      const date = new Date(record.date).toLocaleString('zh-CN');
+    sorted.forEach((record) => {
+      const isPercent = record.strategy.suggestedStake <= 1 && record.strategy.suggestedStake > 0;
+      const stakeAmount = isPercent ? bankroll * record.strategy.suggestedStake : record.strategy.suggestedStake;
       
-      const leagues = record.predictions.map(p => {
+      let pnl = 0;
+      if (record.status === 'won') {
+        pnl = stakeAmount * (record.strategy.totalOdds - 1);
+        bankroll += pnl;
+      } else if (record.status === 'lost') {
+        pnl = -stakeAmount;
+        bankroll += pnl;
+      }
+      
+      map.set(record.id, { stake: stakeAmount, pnl });
+    });
+    return map;
+  }, [displayRecords, initialBankroll]);
+
+  const handleExportExcel = () => {
+    const tableRows = displayRecords.map(record => {
+      const date = new Date(record.date).toLocaleDateString('zh-CN');
+      
+      const strategyPredictions = record.predictions.filter(p => record.strategy.matches.includes(p.matchId));
+      
+      const leagues = strategyPredictions.map(p => {
         const match = record.matches?.find(m => m.id === p.matchId);
         return match?.league || '-';
-      }).join(' / ');
+      }).join(' + ');
       
-      const matchesText = record.predictions.map(p => {
+      const matchesText = strategyPredictions.map(p => {
         const match = record.matches?.find(m => m.id === p.matchId);
         return match ? `${match.homeTeam} vs ${match.awayTeam}` : '未知';
-      }).join(' / ');
+      }).join(' + ');
       
-      const recommendations = record.predictions.map(p => getRecommendationLabel(p.recommendation)).join(' / ');
-      const stake = record.strategy.suggestedStake.toFixed(2);
+      const recommendations = strategyPredictions.map(p => getRecommendationLabel(p.recommendation)).join(' + ');
+      
+      const details = recordDetails.get(record.id) || { stake: 0, pnl: 0 };
+      const stakeFormatted = details.stake.toFixed(2);
       const odds = record.strategy.totalOdds.toFixed(2);
       
       const resultStr = record.status === 'won' ? '红' : record.status === 'lost' ? '黑' : '待定';
       
-      let pnl = '0.00';
-      if (record.status === 'won') {
-        pnl = (Number(stake) * (Number(odds) - 1)).toFixed(2);
-      } else if (record.status === 'lost') {
-        pnl = `-${stake}`;
-      }
+      const pnlFormatted = record.status === 'pending' ? '0.00' : details.pnl.toFixed(2);
       
-      return [
-        `"${date}"`,
-        `"${leagues}"`,
-        `"${matchesText}"`,
-        `"${recommendations}"`,
-        stake,
-        odds,
-        `"${resultStr}"`,
-        pnl
-      ].join(',');
+      // bg-rose-500/10 vs bg-emerald-500/10 -> equivalent colors for excel
+      const rowClass = record.status === 'won' ? 'won' : record.status === 'lost' ? 'lost' : '';
+      
+      return `
+        <tr class="${rowClass}">
+          <td>${date}</td>
+          <td>${leagues}</td>
+          <td>${matchesText}</td>
+          <td>${recommendations}</td>
+          <td style="mso-number-format:'0.00';">${stakeFormatted}</td>
+          <td style="mso-number-format:'0.00';">${odds}</td>
+          <td class="bold">${resultStr}</td>
+          <td class="bold" style="mso-number-format:'0.00';">${pnlFormatted}</td>
+        </tr>
+      `;
     });
     
-    const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const htmlTemplate = `
+      <html xmlns:o="urn:schemas-microsoft-com:office:office"
+            xmlns:x="urn:schemas-microsoft-com:office:excel"
+            xmlns="http://www.w3.org/TR/REC-html40">
+      <head>
+        <meta charset="utf-8">
+        <!--[if gte mso 9]>
+        <xml>
+          <x:ExcelWorkbook>
+            <x:ExcelWorksheets>
+              <x:ExcelWorksheet>
+                <x:Name>实战记录</x:Name>
+                <x:WorksheetOptions>
+                  <x:DisplayGridlines/>
+                </x:WorksheetOptions>
+              </x:ExcelWorksheet>
+            </x:ExcelWorksheets>
+          </x:ExcelWorkbook>
+        </xml>
+        <![endif]-->
+        <style>
+          table { border-collapse: collapse; font-family: sans-serif; white-space: nowrap; }
+          th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+          .won { background-color: #ffe4e6; color: #e11d48; }
+          .lost { background-color: #d1fae5; color: #059669; }
+          .bold { font-weight: bold; }
+          th { background-color: #f4f4f5; color: #3f3f46; font-weight: bold; }
+        </style>
+      </head>
+      <body>
+        <table>
+          <thead>
+            <tr>
+              <th>日期</th>
+              <th>联赛</th>
+              <th>场次</th>
+              <th>推荐方向</th>
+              <th>投入金额(元)</th>
+              <th>组合赔率</th>
+              <th>赛果</th>
+              <th>盈亏(元)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tableRows.join('')}
+          </tbody>
+          <tfoot>
+            <tr style="background-color: #f4f4f5; font-weight: bold;">
+              <td colspan="4" style="text-align: right;">汇总：</td>
+              <td></td>
+              <td>均赔: ${stats.avgOdds.toFixed(2)}</td>
+              <td style="color: #059669;">胜率: ${stats.winRate.toFixed(1)}%</td>
+              <td style="color: ${stats.totalProfit > 0 ? '#e11d48' : stats.totalProfit < 0 ? '#059669' : '#3f3f46'};">
+                总盈亏: ${stats.totalProfit > 0 ? '+' : ''}${stats.totalProfit.toFixed(2)}
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      </body>
+      </html>
+    `;
+    
+    const blob = new Blob([htmlTemplate], { type: 'application/vnd.ms-excel;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `实战记录_${new Date().toLocaleDateString('zh-CN').replace(/\//g, '')}.csv`;
+    link.download = `实战记录_${new Date().toLocaleDateString('zh-CN').replace(/\//g, '')}.xls`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
   };
 
-  if (records.length === 0) {
+
+  if (displayRecords.length === 0) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 h-full">
         <Trophy className="w-16 h-16 mb-4 text-zinc-700" />
@@ -180,11 +274,11 @@ export function HistoryView({ records, initialBankroll, onDeleteRecord, onUpdate
           </div>
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <button
-              onClick={handleExportCsv}
+              onClick={handleExportExcel}
               className="flex-1 sm:flex-none flex justify-center items-center gap-2 px-4 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-medium rounded-lg transition-colors border border-emerald-500/20"
             >
               <Download className="w-4 h-4" />
-              导出 CSV
+              导出报表
             </button>
             {onClearAllRecords && (
               <button
@@ -312,7 +406,7 @@ export function HistoryView({ records, initialBankroll, onDeleteRecord, onUpdate
                 <tr>
                   <th className="px-4 py-3 whitespace-nowrap">日期</th>
                   <th className="px-4 py-3 whitespace-nowrap">联赛</th>
-                  <th className="px-4 py-3 min-w-[200px]">场次</th>
+                  <th className="px-4 py-3 whitespace-nowrap">场次</th>
                   <th className="px-4 py-3 whitespace-nowrap">推荐方向</th>
                   <th className="px-4 py-3 whitespace-nowrap text-right">投入金额</th>
                   <th className="px-4 py-3 whitespace-nowrap text-right">组合赔率</th>
@@ -322,35 +416,37 @@ export function HistoryView({ records, initialBankroll, onDeleteRecord, onUpdate
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-800/50">
-                {records.map((record) => {
+                {displayRecords.map((record) => {
                   const date = new Date(record.date).toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' });
                   
-                  const leagues = record.predictions.map(p => {
+                  const strategyPredictions = record.predictions.filter(p => record.strategy.matches.includes(p.matchId));
+                  
+                  const leagues = strategyPredictions.map(p => {
                     const match = record.matches?.find(m => m.id === p.matchId);
                     return match?.league || '-';
                   }).join(', ');
                   
-                  const matchesText = record.predictions.map((p, i) => {
+                  const matchesText = strategyPredictions.map((p, i) => {
                     const match = record.matches?.find(m => m.id === p.matchId);
-                    return <div key={i} className="truncate">{match ? `${match.homeTeam} vs ${match.awayTeam}` : '未知'}</div>;
+                    return <div key={i} className="whitespace-nowrap">{match ? `${match.homeTeam} vs ${match.awayTeam}` : '未知'}</div>;
                   });
                   
-                  const recommendations = record.predictions.map((p, i) => (
+                  const recommendations = strategyPredictions.map((p, i) => (
                     <div key={i}>{getRecommendationLabel(p.recommendation)}</div>
                   ));
                   
-                  const stake = record.strategy.suggestedStake.toFixed(2);
+  const details = recordDetails.get(record.id) || { stake: 0, pnl: 0 };
+                  const stake = details.stake.toFixed(2);
                   const odds = record.strategy.totalOdds.toFixed(2);
                   
-                  let pnl = 0;
-                  if (record.status === 'won') {
-                    pnl = Number(stake) * (Number(odds) - 1);
-                  } else if (record.status === 'lost') {
-                    pnl = -Number(stake);
-                  }
+                  const pnl = details.pnl;
 
                   return (
-                    <tr key={record.id} className="hover:bg-zinc-800/20 transition-colors group">
+                    <tr key={record.id} className={`transition-colors group ${
+                      record.status === 'won' ? 'bg-rose-500/10 hover:bg-rose-500/20' : 
+                      record.status === 'lost' ? 'bg-emerald-500/10 hover:bg-emerald-500/20' : 
+                      'hover:bg-zinc-800/20'
+                    }`}>
                       <td className="px-4 py-3 whitespace-nowrap text-zinc-300">{date}</td>
                       <td className="px-4 py-3 whitespace-nowrap text-zinc-400">{leagues}</td>
                       <td className="px-4 py-3 text-zinc-300 font-medium">{matchesText}</td>
@@ -362,17 +458,17 @@ export function HistoryView({ records, initialBankroll, onDeleteRecord, onUpdate
                           value={record.status}
                           onChange={(e) => onUpdateStatus(record.id, e.target.value as any)}
                           className={`text-xs font-bold px-2 py-1 rounded border outline-none appearance-none cursor-pointer ${
-                            record.status === 'won' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-                            record.status === 'lost' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' :
+                            record.status === 'won' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' :
+                            record.status === 'lost' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
                             'bg-amber-500/10 text-amber-400 border-amber-500/20'
                           }`}
                         >
                           <option value="pending" className="bg-zinc-900 text-amber-400">待定</option>
-                          <option value="won" className="bg-zinc-900 text-emerald-400">红</option>
-                          <option value="lost" className="bg-zinc-900 text-rose-400">黑</option>
+                          <option value="won" className="bg-zinc-900 text-rose-400">红</option>
+                          <option value="lost" className="bg-zinc-900 text-emerald-400">黑</option>
                         </select>
                       </td>
-                      <td className={`px-4 py-3 whitespace-nowrap text-right font-bold font-mono ${pnl > 0 ? 'text-emerald-400' : pnl < 0 ? 'text-rose-400' : 'text-zinc-500'}`}>
+                      <td className={`px-4 py-3 whitespace-nowrap text-right font-bold font-mono ${pnl > 0 ? 'text-rose-400' : pnl < 0 ? 'text-emerald-400' : 'text-zinc-500'}`}>
                         {record.status === 'pending' ? '-' : `${pnl > 0 ? '+' : ''}${pnl.toFixed(2)}`}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-center">
@@ -388,6 +484,17 @@ export function HistoryView({ records, initialBankroll, onDeleteRecord, onUpdate
                   );
                 })}
               </tbody>
+              <tfoot className="bg-zinc-800/50 text-zinc-300 font-medium">
+                <tr>
+                  <td colSpan={5} className="px-4 py-3 text-right">汇总：</td>
+                  <td className="px-4 py-3 whitespace-nowrap text-right text-amber-400/90 font-mono">均赔: {stats.avgOdds.toFixed(2)}</td>
+                  <td className="px-4 py-3 whitespace-nowrap text-center text-emerald-400">胜率: {stats.winRate.toFixed(1)}%</td>
+                  <td className={`px-4 py-3 whitespace-nowrap text-right font-bold font-mono ${stats.totalProfit > 0 ? 'text-rose-400' : stats.totalProfit < 0 ? 'text-emerald-400' : 'text-zinc-300'}`}>
+                    总盈亏: {stats.totalProfit > 0 ? '+' : ''}{stats.totalProfit.toFixed(2)}
+                  </td>
+                  <td></td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         </div>

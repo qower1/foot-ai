@@ -94,9 +94,9 @@ Please output a raw JSON object only. The JSON must exactly match the structure:
       text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
     }
     
-    if (!text) return {};
-    if (text.startsWith('\`\`\`json')) {
-      text = text.replace(/^\`\`\`json\n/, '').replace(/\n\`\`\`$/, '');
+    if (text) {
+      // Remove markdown codeblock artifacts that models sometimes insert
+      text = text.replace(/```json/gi, '').replace(/```/g, '').trim();
     }
     const parsed = JSON.parse(text);
     const mapping: Record<string, number> = {};
@@ -215,6 +215,8 @@ export async function analyzeMatches(
           if (predRes.ok) {
             const predData = await predRes.json();
             return { matchId, predData };
+          } else {
+            console.warn(`Failed to fetch api-football predictions for fixture=${fixtureId}:`, predRes.status);
           }
           return null;
         });
@@ -235,6 +237,9 @@ export async function analyzeMatches(
             };
           }), null, 2) + '\n(请在分析时重点结合上述海外专家系统给出的精准数据，例如胜率、预期进球等进行多维度推演)';
         }
+      } else {
+        const errJson = await fixRes.json().catch(() => ({}));
+        console.warn('Failed to fetch api-football fixtures:', fixRes.status, errJson);
       }
     }
   } catch (error) {
@@ -404,9 +409,9 @@ You MUST return ONLY valid JSON matching this exact structure:
 
     if (!text) throw new Error('No response from AI');
     
-    // Sometimes DeepSeek returns markdown wrapped JSON
-    if (text.startsWith('```json')) {
-      text = text.replace(/^```json\n/, '').replace(/\n```$/, '');
+    // Remove markdown codeblock artifacts that deepseek/gemini sometimes insert
+    if (text) {
+      text = text.replace(/```json/gi, '').replace(/```/g, '').trim();
     }
     
     const aiResult = JSON.parse(text);

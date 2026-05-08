@@ -138,12 +138,17 @@ export default function App() {
   const handleSaveHistory = () => {
     if (!analysisResult) return;
     
+    if (analysisResult.strategy.matches.length !== 2) {
+      alert('实战记录仅用于追踪“2串1”策略。当前结果不满足2串1，暂不记录。');
+      return;
+    }
+    
     const newRecord: HistoryRecord = {
       id: Date.now().toString(),
       date: new Date().toISOString(),
       strategy: analysisResult.strategy,
       predictions: analysisResult.predictions,
-      matches: matches.filter(m => analysisResult.strategy.matches.includes(m.id) || analysisResult.predictions.some(p => p.matchId === m.id)),
+      matches: matches.filter(m => analysisResult.strategy.matches.includes(m.id)),
       status: 'pending'
     };
     
